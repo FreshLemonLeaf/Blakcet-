@@ -1,0 +1,219 @@
+let extra_delay = 0,
+    max_delay = Object.values(blacket.rarities)
+        .map(e => e.wait)
+        .reduce((max, current) => Math.max(max, current)) + extra_delay;
+
+const rarityOrder = Object.entries(blacket.rarities)
+    .sort((a, b) => a[1].exp - b[1].exp)
+    .map(entry => entry[0]);
+
+const pSBC = (p, c0, c1, l) => {
+    let r, g, b, P, f, t, h, i = parseInt, m = Math.round;
+    const a = typeof c1 == "string";
+    if (typeof p != "number" || p < -1 || p > 1 || typeof c0 != "string" || (c0[0] != "r" && c0[0] != "#") || (c1 && !a)) return null;
+    if (!this.pSBCr)
+        this.pSBCr = d => {
+            let n = d.length, x = {};
+            if (n > 9) {
+                ([r, g, b, a] = d = d.split(",")), (n = d.length);
+                if (n < 3 || n > 4) return null;
+                (x.r = i(r[3] == "a" ? r.slice(5) : r.slice(4))),
+                    (x.g = i(g)),
+                    (x.b = i(b)),
+                    (x.a = a ? parseFloat(a) : -1);
+            } else {
+                if (n == 8 || n == 6 || n < 4) return null;
+                d = "#" + d[1] + d[1] + d[2] + d[2] + d[3] + d[3] + (n > 4 ? d[4] + d[4] : "");
+                (x.r = (t = i(d.slice(1), 16)) >> 16), (x.g = (t >> 8) & 255), (x.b = t & 255), (x.a = -1);
+            }
+            return x;
+        };
+    (h = c0.length > 9),
+        (h = a ? c1.length > 9 ? true : c1 == "c" && !h : h),
+        (f = this.pSBCr(c0)),
+        (P = p < 0),
+        (t = c1 && c1 != "c" ? this.pSBCr(c1) : P ? { r: 0, g: 0, b: 0, a: -1 } : { r: 255, g: 255, b: 255, a: -1 }),
+        (p = P ? p * -1 : p),
+        (P = 1 - p);
+    return "rgb" + (h ? "a(" : "(") + m(P * f.r + p * t.r) + "," + m(P * f.g + p * t.g) + "," + m(P * f.b + p * t.b) + (h ? "," + m((P * f.a + p * t.a) * 1000) / 1000 : "") + ")";
+};
+
+const getWeightedRandomBlook = () => {
+    const blooks = Object.keys(blacket.blooks);
+    const weights = blooks.map(blook => {
+        const rarity = blacket.blooks[blook].rarity;
+        const rarityData = blacket.rarities[rarity];
+        return 1 / (rarityData.exp || 1);
+    });
+    
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+    let random = Math.random() * totalWeight;
+    
+    for (let i = 0; i < blooks.length; i++) {
+        random -= weights[i];
+        if (random <= 0) return blooks[i];
+    }
+    return blooks[blooks.length - 1];
+};
+
+const openPack = async pack => {
+    return new Promise((resolve, reject) => {
+        try {
+            const blook = getWeightedRandomBlook();
+            resolve(blook);
+        } catch (error) {
+            reject(error);
+        }
+    });
+};
+
+const logBlook = (blook, index, total) => {
+    if (!blook || !blacket.blooks[blook]) {
+        console.log(`%c Invalid Blook %c(${index}/${total})`, 
+            "color: red; font-size: 2vw; font-weight: bold;", 
+            "font-size: 0.8vw; color: gray;");
+        return;
+    }
+    
+    const rarity = blacket.blooks[blook].rarity;
+    const color = blacket.rarities[rarity]?.color || "#ffffff";
+    const rarityName = rarity.toUpperCase();
+    
+    console.log(`%c ${blook} %c[${rarityName}] %c(${index}/${total})`,
+        `color: #fff; font-size: 2vw; text-shadow: 0 0 0.5vw rgba(255,255,255,0.4), -0.15vw -0.15vw 0 #fff; font-family: 'Titan One', monospace; background: linear-gradient(45deg, ${color}, ${pSBC(0.5, color)}); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold;`,
+        `color: ${color}; font-size: 1vw; font-weight: bold;`,
+        "font-size: 0.8vw; color: gray;"
+    );
+};
+
+const displaySummary = (results, amount) => {
+    console.log("%c ", "font-size: 3em;");
+    console.log(`%c📦 ${amount} Pack Results Summary 📦`, 
+        "font-size: 3em; color: #4CAF50; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);");
+    
+    const summary = results.reduce((acc, blook) => {
+        if (blook && blacket.blooks[blook]) {
+            const rarity = blacket.blooks[blook].rarity;
+            if (!acc[rarity]) acc[rarity] = {};
+            acc[rarity][blook] = (acc[rarity][blook] || 0) + 1;
+        }
+        return acc;
+    }, {});
+
+    const sortedRarities = Object.keys(summary).sort((a, b) => 
+        rarityOrder.indexOf(b) - rarityOrder.indexOf(a)
+    );
+
+    sortedRarities.forEach(rarity => {
+        const color = blacket.rarities[rarity]?.color || "#ffffff";
+        const blooksInRarity = summary[rarity];
+        const totalCount = Object.values(blooksInRarity).reduce((sum, count) => sum + count, 0);
+        
+        console.log(`%c🎯 ${rarity.toUpperCase()} (${totalCount} total)`, 
+            `color: ${color}; font-size: 1.5em; font-weight: bold; margin-top: 10px;`);
+        
+        Object.entries(blooksInRarity)
+            .sort(([,a], [,b]) => b - a)
+            .forEach(([blook, count]) => {
+                console.log(`%c  ${blook} %c×${count}`,
+                    `color: #fff; font-size: 1.2em; background: linear-gradient(45deg, ${color}, ${pSBC(0.5, color)}); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold;`,
+                    `color: ${color}; font-weight: bold;`
+                );
+            });
+    });
+};
+
+const main = async (pack, amount) => {
+    console.clear();
+    console.log(`%c🚀 Starting pack simulation: ${pack} (${amount} packs)`, 
+        "font-size: 2em; color: #2196F3; font-weight: bold;");
+    
+    const results = [];
+    const startTime = Date.now();
+    
+    for (let i = 0; i < amount; i++) {
+        try {
+            const blook = await openPack(pack);
+            results.push(blook);
+            logBlook(blook, i + 1, amount);
+            
+            if (blook && blacket.blooks[blook]) {
+                const delay = blacket.rarities[blacket.blooks[blook].rarity]?.wait || 100;
+                await new Promise(resolve => setTimeout(resolve, delay + extra_delay));
+            }
+        } catch (error) {
+            console.error(`Error opening pack ${i + 1}:`, error);
+            await new Promise(resolve => setTimeout(resolve, max_delay));
+        }
+    }
+    
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000;
+    
+    displaySummary(results, amount);
+    console.log(`%c⏱️ Simulation completed in ${duration.toFixed(2)} seconds`, 
+        "font-size: 1.2em; color: #FF9800; font-weight: bold;");
+    
+    return results;
+};
+
+const getValidPack = () => {
+    const packs = Object.keys(blacket.packs);
+    let pack;
+    
+    do {
+        if (pack && !packs.includes(pack)) {
+            if (!confirm(`"${pack}" is not a valid pack. Available packs: ${packs.join(', ')}\n\nTry again?`)) {
+                return null;
+            }
+        }
+        pack = prompt(`Enter pack name (Available: ${packs.join(', ')}):`);
+        if (pack === null) return null;
+        pack = pack.trim();
+    } while (!pack || !packs.includes(pack));
+    
+    return pack;
+};
+
+const getValidAmount = () => {
+    let amount;
+    
+    do {
+        const input = prompt("Enter number of packs to open (1-1000):");
+        if (input === null) return null;
+        
+        amount = parseInt(input);
+        if (isNaN(amount) || amount < 1) {
+            if (!confirm("Please enter a valid number (1 or greater). Try again?")) {
+                return null;
+            }
+        } else if (amount > 1000) {
+            if (!confirm("Large amounts may slow down your browser. Continue anyway?")) {
+                amount = null;
+            }
+        }
+    } while (!amount || amount < 1);
+    
+    return amount;
+};
+
+const init = async () => {
+    try {
+        if (typeof blacket === 'undefined') {
+            throw new Error('Blacket game data not found. Make sure you\'re running this on the Blacket website.');
+        }
+        
+        const pack = getValidPack();
+        if (!pack) return;
+        
+        const amount = getValidAmount();
+        if (!amount) return;
+        
+        await main(pack, amount);
+    } catch (error) {
+        console.error('Script error:', error);
+        alert(`Error: ${error.message}`);
+    }
+};
+
+init();
