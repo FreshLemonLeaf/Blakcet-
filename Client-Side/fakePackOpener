@@ -1,4 +1,4 @@
-let extra_delay = 0,
+let extra_delay = 00,
     max_delay = Object.values(blacket.rarities)
         .map(e => e.wait)
         .reduce((max, current) => Math.max(max, current)) + extra_delay;
